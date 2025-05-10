@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   analyzeRepository,
   type TechData as AnalyzerTechData,
@@ -32,6 +32,9 @@ import {
   GitBranch,
   FolderGit,
   Copyright,
+  X,
+  ChevronRight,
+  Sparkles,
 } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,18 +51,9 @@ import "highlight.js/styles/github.css";
 import "./App.css";
 import Navbar from "./components/Navbar";
 
-// Define data types
-// Use types from analyzer.ts for consistency
-interface TechItem extends AnalyzerTechItem {
-  // name: string; // Now from AnalyzerTechItem
-  // icon: React.ReactNode; // Now from AnalyzerTechItem, changed from string
-  // color string is no longer used with component icons, can be removed if not used elsewhere.
-}
+interface TechItem extends AnalyzerTechItem {}
 
-interface RepoInfo extends AnalyzerRepoInfo {
-  // All fields should be covered by AnalyzerRepoInfo
-  // No need to redefine if they are identical
-}
+interface RepoInfo extends AnalyzerRepoInfo {}
 
 interface TechData {
   languages: TechItem[];
@@ -67,13 +61,128 @@ interface TechData {
   apis: TechItem[];
   resources: TechItem[];
   repoInfo: RepoInfo;
+  groupedTech?: {
+    languages: { [key: string]: TechItem[] };
+    frameworks: { [key: string]: TechItem[] };
+    apis: { [key: string]: TechItem[] };
+    resources: { [key: string]: TechItem[] };
+  };
 }
 
-// Tech stack data (ROUGH MOCK DATA) - This is now removed as we fetch real data.
-// const mockTechData: TechData = { ... };
+// Group Modal Component
+interface GroupModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  groupName: string;
+  items: TechItem[];
+}
 
-// Function to fetch GitHub repository data - This is now removed as its logic is in analyzer.ts
-// const fetchGitHubRepo = async ( ... ): Promise<RepoInfo | null> => { ... };
+const GroupModal = ({ isOpen, onClose, groupName, items }: GroupModalProps) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(event.target as Node)
+      ) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div
+        ref={modalRef}
+        className="relative bg-white dark:bg-gray-900 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-xl"
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Sparkles size={20} className="text-blue-500" />
+            <span>{groupName} Family</span>
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-6 overflow-auto max-h-[calc(80vh-60px)]">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            {items.length} technologies related to {groupName}:
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {items.map((item) => (
+              <Card
+                key={item.name}
+                className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
+              >
+                <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+                  <div className="mb-2 flex justify-center items-center h-10 w-10">
+                    {item.icon}
+                  </div>
+                  <h3 className="font-medium text-sm">{item.name}</h3>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Stacked Card (for grouped items)
+interface StackedCardProps {
+  groupKey: string;
+  items: TechItem[];
+  onClick: () => void;
+}
+
+const StackedCard = ({ groupKey, items, onClick }: StackedCardProps) => {
+  // Display main item in the stacked card
+  const mainItem = items[0];
+  const itemCount = items.length;
+
+  return (
+    <div className="relative cursor-pointer" onClick={onClick}>
+      {/* Background cards for stacked effect */}
+      <div className="absolute -right-1 -bottom-1 w-full h-full bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
+      <div className="absolute -right-0.5 -bottom-0.5 w-full h-full bg-gray-100 dark:bg-gray-800 rounded-xl"></div>
+
+      {/* Main card */}
+      <Card className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all relative z-10">
+        <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+          <div className="mb-2 flex justify-center items-center h-10 w-10">
+            {mainItem.icon}
+          </div>
+          <h3 className="font-medium text-sm flex items-center gap-1">
+            {mainItem.name}
+            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full px-2 py-0.5">
+              +{itemCount - 1}
+            </span>
+          </h3>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center">
+            <span>View all</span>
+            <ChevronRight className="w-3 h-3 ml-1" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 function App() {
   const [url, setUrl] = useState("");
@@ -82,6 +191,74 @@ function App() {
   const [techData, setTechData] = useState<TechData | null>(null);
   const [activeTab, setActiveTab] = useState("tech");
   const [readmeView, setReadmeView] = useState("rendered");
+  const [activeSection, setActiveSection] = useState<string>("languages");
+
+  // Refs for navigation menu
+  const languagesRef = useRef<HTMLDivElement>(null);
+  const frameworksRef = useRef<HTMLDivElement>(null);
+  const apisRef = useRef<HTMLDivElement>(null);
+  const resourcesRef = useRef<HTMLDivElement>(null);
+
+  // Tech group modal state
+  const [selectedGroup, setSelectedGroup] = useState<{
+    name: string;
+    items: TechItem[];
+  } | null>(null);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+
+  // Function to scroll to section
+  const scrollToSection = (section: string) => {
+    setActiveSection(section);
+
+    const refMap = {
+      languages: languagesRef,
+      frameworks: frameworksRef,
+      apis: apisRef,
+      resources: resourcesRef,
+    };
+
+    const ref = refMap[section as keyof typeof refMap];
+    if (ref?.current) {
+      // Resource section different offset due to being last section
+      const yOffset = section === "resources" ? -150 : -90;
+      const element = ref.current;
+      const y = element.getBoundingClientRect().top + window.scrollY + yOffset;
+
+      window.scrollTo({
+        top: y,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  // Navigation menu active selection based on scroll
+  useEffect(() => {
+    if (!techData) return;
+
+    const handleScroll = () => {
+      const sections = [
+        { id: "languages", ref: languagesRef },
+        { id: "frameworks", ref: frameworksRef },
+        { id: "apis", ref: apisRef },
+        { id: "resources", ref: resourcesRef },
+      ];
+
+      for (const section of sections) {
+        if (!section.ref.current) continue;
+
+        const rect = section.ref.current.getBoundingClientRect();
+        if (rect.top <= 120 && rect.bottom >= 120) {
+          setActiveSection(section.id);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [techData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +286,7 @@ function App() {
     }
 
     try {
-      // Use the new analyzer function to fetch and process data
+      // Use analyzer function to fetch and process data
       const analysisResult = await analyzeRepository(
         repoDetails.owner,
         repoDetails.repo
@@ -120,7 +297,6 @@ function App() {
       }
 
       // Set the fetched and analyzed data
-      // The analyzer returns TechData directly, so we don't need the type assertion
       setTechData(analysisResult);
       setIsLoading(false);
     } catch (err) {
@@ -148,10 +324,100 @@ function App() {
     }
   };
 
+  // Function to handle group card click
+  const handleGroupClick = (groupName: string, items: TechItem[]) => {
+    setSelectedGroup({ name: groupName, items });
+    setIsGroupModalOpen(true);
+  };
+
+  // Modified render functions for each tech section to include refs and IDs
+  const renderTechSection = (
+    title: string,
+    icon: React.ReactNode,
+    items: TechItem[],
+    groupedItems: { [key: string]: TechItem[] } | undefined,
+    ref: React.RefObject<HTMLDivElement | null>,
+    sectionId: string
+  ) => {
+    // Array of items not in groupedItems
+    const nonGroupedItems = items.filter((item) => {
+      if (!groupedItems) return true;
+      return !Object.values(groupedItems)
+        .flat()
+        .some(
+          (groupItem) =>
+            groupItem.name === item.name &&
+            // Exclude if it's the main item of group
+            !Object.entries(groupedItems).some(
+              ([key, groupItems]) => groupItems[0].name === item.name
+            )
+        );
+    });
+
+    return (
+      <div ref={ref} id={sectionId}>
+        <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
+          <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
+            <div className="flex items-center">
+              {icon}
+              <CardTitle>{title}</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6 pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {/* Render grouped items first */}
+              {groupedItems &&
+                Object.entries(groupedItems).map(([key, groupItems]) => (
+                  <StackedCard
+                    key={key}
+                    groupKey={key}
+                    items={groupItems}
+                    onClick={() => handleGroupClick(key, groupItems)}
+                  />
+                ))}
+
+              {/* Render non-grouped items */}
+              {nonGroupedItems.map((item) => (
+                <Card
+                  key={item.name}
+                  className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
+                >
+                  <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+                    <div className="mb-2 flex justify-center items-center h-10 w-10">
+                      {item.icon}
+                    </div>
+                    <h3 className="font-medium text-sm">{item.name}</h3>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {items.length === 0 && (
+                <div className="col-span-full text-center text-gray-500 dark:text-gray-400 py-4">
+                  No {title.toLowerCase()} detected
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white">
+    <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="min-h-screen flex flex-col items-center justify-start px-4 pt-24 pb-16 bg-white dark:bg-black text-gray-900 dark:text-white">
+
+      {/* Group Modal */}
+      {selectedGroup && (
+        <GroupModal
+          isOpen={isGroupModalOpen}
+          onClose={() => setIsGroupModalOpen(false)}
+          groupName={selectedGroup.name}
+          items={selectedGroup.items}
+        />
+      )}
+
+      <main className="flex-1 flex flex-col items-center justify-start px-4 pt-24 pb-16 bg-white dark:bg-black text-gray-900 dark:text-white">
         <h1 className="text-4xl md:text-5xl font-bold mb-4">What the Tech!</h1>
 
         <p className="text-lg mb-10 max-w-xl leading-relaxed text-center">
@@ -262,7 +528,7 @@ function App() {
                     className="mx-auto mt-2 bg-[#24292f] text-white hover:bg-[#24292f] hover:text-white hover:scale-105 transition-transform duration-150 ease-in-out"
                   >
                     <a
-                      href={url} // The original URL entered by the user
+                      href={url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2"
@@ -345,126 +611,158 @@ function App() {
 
               {/* Technology Stack Tab Content */}
               {activeTab === "tech" && (
-                <div className="space-y-6">
-                  {/* Languages Section */}
-                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
-                      <div className="flex items-center">
-                        <Code className="mr-2 h-5 w-5" />
-                        <CardTitle>Languages</CardTitle>
+                <div className="relative">
+                  {/* Left side navigation (sticky) */}
+                  <div className="hidden md:block fixed left-8 top-1/2 transform -translate-y-1/2 w-40 z-10">
+                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 overflow-hidden shadow-md">
+                      <div className="py-2 px-3 border-b border-gray-100 dark:border-gray-800">
+                        <h3 className="text-sm font-medium text-center">
+                          Navigation Menu
+                        </h3>
                       </div>
-                    </CardHeader>
-                    <CardContent className="pt-6 pb-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {techData?.languages.map((lang) => (
-                          <Card
-                            key={lang.name}
-                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
-                          >
-                            <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                              {/* Updated icon rendering: provides a consistent container */}
-                              <div className="mb-2 flex justify-center items-center h-10 w-10">
-                                {lang.icon}
-                              </div>
-                              <h3 className="font-medium text-sm">
-                                {lang.name}
-                              </h3>
-                            </CardContent>
-                          </Card>
-                        ))}
+                      <div className="p-2 space-y-1.5">
+                        <button
+                          onClick={() => scrollToSection("languages")}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            activeSection === "languages"
+                              ? "bg-white dark:bg-gray-800 font-medium shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <Code className="mr-2 h-4 w-4" />
+                            <span>Languages</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("frameworks")}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            activeSection === "frameworks"
+                              ? "bg-white dark:bg-gray-800 font-medium shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <Layers className="mr-2 h-4 w-4" />
+                            <span>Frameworks</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("apis")}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            activeSection === "apis"
+                              ? "bg-white dark:bg-gray-800 font-medium shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <Database className="mr-2 h-4 w-4" />
+                            <span>APIs</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("resources")}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            activeSection === "resources"
+                              ? "bg-white dark:bg-gray-800 font-medium shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <FileType className="mr-2 h-4 w-4" />
+                            <span>Resources</span>
+                          </div>
+                        </button>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
 
-                  {/* Frameworks Section */}
-                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
-                      <div className="flex items-center">
-                        <Layers className="mr-2 h-5 w-5" />
-                        <CardTitle>Frameworks & Libraries</CardTitle>
+                  {/* Mobile navigation */}
+                  <div className="md:hidden mb-6">
+                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 overflow-hidden">
+                      <div className="p-2 flex space-x-1">
+                        <button
+                          onClick={() => scrollToSection("languages")}
+                          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            activeSection === "languages"
+                              ? "bg-white dark:bg-gray-800 shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          Languages
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("frameworks")}
+                          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            activeSection === "frameworks"
+                              ? "bg-white dark:bg-gray-800 shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          Frameworks
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("apis")}
+                          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            activeSection === "apis"
+                              ? "bg-white dark:bg-gray-800 shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          APIs
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("resources")}
+                          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            activeSection === "resources"
+                              ? "bg-white dark:bg-gray-800 shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          Resources
+                        </button>
                       </div>
-                    </CardHeader>
-                    <CardContent className="pt-6 pb-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {techData?.frameworks.map((framework) => (
-                          <Card
-                            key={framework.name}
-                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
-                          >
-                            <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                              {/* Updated icon rendering */}
-                              <div className="mb-2 flex justify-center items-center h-10 w-10">
-                                {framework.icon}
-                              </div>
-                              <h3 className="font-medium text-sm">
-                                {framework.name}
-                              </h3>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
 
-                  {/* APIs Section */}
-                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
-                      <div className="flex items-center">
-                        <Database className="mr-2 h-5 w-5" />
-                        <CardTitle>APIs</CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-6 pb-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {techData?.apis.map((api) => (
-                          <Card
-                            key={api.name}
-                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
-                          >
-                            <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                              {/* Updated icon rendering */}
-                              <div className="mb-2 flex justify-center items-center h-10 w-10">
-                                {api.icon}
-                              </div>
-                              <h3 className="font-medium text-sm">
-                                {api.name}
-                              </h3>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {/* Main tech stack content */}
+                  <div className="space-y-6">
+                    {renderTechSection(
+                      "Languages",
+                      <Code className="mr-2 h-5 w-5" />,
+                      techData.languages,
+                      techData.groupedTech?.languages,
+                      languagesRef,
+                      "languages"
+                    )}
 
-                  {/* Resources Section */}
-                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
-                      <div className="flex items-center">
-                        <FileType className="mr-2 h-5 w-5" />
-                        <CardTitle>Resources</CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-6 pb-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {techData?.resources.map((resource) => (
-                          <Card
-                            key={resource.name}
-                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
-                          >
-                            <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                              {/* Updated icon rendering */}
-                              <div className="mb-2 flex justify-center items-center h-10 w-10">
-                                {resource.icon}
-                              </div>
-                              <h3 className="font-medium text-sm">
-                                {resource.name}
-                              </h3>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                    {renderTechSection(
+                      "Frameworks & Libraries",
+                      <Layers className="mr-2 h-5 w-5" />,
+                      techData.frameworks,
+                      techData.groupedTech?.frameworks,
+                      frameworksRef,
+                      "frameworks"
+                    )}
+
+                    {renderTechSection(
+                      "APIs",
+                      <Database className="mr-2 h-5 w-5" />,
+                      techData.apis,
+                      techData.groupedTech?.apis,
+                      apisRef,
+                      "apis"
+                    )}
+
+                    {renderTechSection(
+                      "Resources",
+                      <FileType className="mr-2 h-5 w-5" />,
+                      techData.resources,
+                      techData.groupedTech?.resources,
+                      resourcesRef,
+                      "resources"
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -574,7 +872,7 @@ function App() {
                         </>
                       )}
 
-                      {/* Topics */}
+                      {/* Topics Section */}
                       {techData?.repoInfo.topics &&
                         techData.repoInfo.topics.length > 0 && (
                           <>
@@ -815,6 +1113,21 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-200 dark:border-gray-800 py-8 w-full bg-white dark:bg-black">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col items-center">
+            <p className="text-gray-500 dark:text-gray-400 mb-2">
+              What The Tech!
+            </p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              Kyle Khai Tran | 2025
+            </p>
+            <div className="h-6"></div> {/* Small extra space */}
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

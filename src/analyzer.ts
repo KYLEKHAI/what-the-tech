@@ -1,14 +1,12 @@
-// src/analyzer.ts
-import { getDevIcon } from "./components/DevIconMap";
+import { getDevIcon } from "./components/DevIconMapper";
 
-// Re-define types here or import from a shared types.ts if you create one
-// For now, co-locating simplified versions or assuming they are available globally for snippet.
-// In a real setup, you'd import these from where App.tsx defines them or a shared types file.
+// Tech item interface
 export interface TechItem {
   name: string;
   icon: React.ReactNode;
 }
 
+// Repo info interface
 export interface RepoInfo {
   name: string;
   owner: string;
@@ -43,11 +41,69 @@ export interface TechData {
   apis: TechItem[];
   resources: TechItem[];
   repoInfo: RepoInfo;
+  groupedTech: {
+    languages: { [key: string]: TechItem[] };
+    frameworks: { [key: string]: TechItem[] };
+    apis: { [key: string]: TechItem[] };
+    resources: { [key: string]: TechItem[] };
+  };
 }
 
+// GitHub API base URL
 const GITHUB_API_BASE = "https://api.github.com";
+// GitHub token for API requests
 const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN;
 
+// Function to detect if a file is a media file from its name
+function isMediaFile(fileName: string): boolean {
+  const mediaExtensions = [
+    // Images
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".webp",
+    ".bmp",
+    ".ico",
+    ".tiff",
+    // Audio or Video
+    ".mp3",
+    ".mp4",
+    ".wav",
+    ".avi",
+    ".mov",
+    ".flv",
+    ".webm",
+    ".ogg",
+    ".m4a",
+    // Documents
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    // Archives
+    ".zip",
+    ".rar",
+    ".tar",
+    ".gz",
+    ".7z",
+    // Other media
+    ".eps",
+    ".psd",
+    ".ai",
+    ".indd",
+    ".raw",
+  ];
+
+  const lowerFileName = fileName.toLowerCase();
+  return mediaExtensions.some((ext) => lowerFileName.endsWith(ext));
+}
+
+// Function to fetch GitHub API
 async function fetchGitHubApi<T>(
   url: string,
   isRawContent: boolean = false
@@ -85,17 +141,17 @@ async function fetchGitHubApi<T>(
   }
 }
 
+// Function to fetch file content
 async function fetchFileContent(
   owner: string,
   repo: string,
   path: string
 ): Promise<string | null> {
   const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${path}`;
-  // Try fetching raw first, if it's a text file this is efficient
+  // Fetch raw content first
   let content = await fetchGitHubApi<string>(url, true);
 
   if (content === null || typeof content !== "string") {
-    // If raw failed or returned JSON object (e.g. 404 gave JSON)
     // Fallback to JSON endpoint to get base64 content
     const fileData = await fetchGitHubApi<{
       content?: string;
@@ -110,13 +166,12 @@ async function fetchFileContent(
         return null;
       }
     } else if (fileData && fileData.message) {
-      // E.g. "Not Found"
       console.log(
         `File ${path} not found or issue fetching: ${fileData.message}`
       );
       return null;
     } else {
-      return null; // Could not retrieve content
+      return null;
     }
   }
   return content;
@@ -208,7 +263,7 @@ export const fetchGitHubRepoData = async (
   };
 };
 
-// Keywords for categorization (simplified, can be greatly expanded)
+// Keywords for categorization
 const K = {
   FRAMEWORKS_LIBS: [
     "react",
@@ -354,6 +409,322 @@ const K = {
   ],
 };
 
+// Function to group related technologies together
+function groupRelatedTechnologies(techItems: TechItem[]): {
+  [key: string]: TechItem[];
+} {
+  const groups: { [key: string]: TechItem[] } = {};
+
+  // Define common prefixes/categories for grouping
+  const commonPrefixes = [
+    // Frontend frameworks & libraries
+    "react",
+    "vue",
+    "angular",
+    "svelte",
+    "next",
+    "gatsby",
+    "nuxt",
+    "solid",
+    "preact",
+    "qwik",
+    "astro",
+
+    // Build tools
+    "webpack",
+    "vite",
+    "babel",
+    "esbuild",
+    "rollup",
+    "parcel",
+    "gulp",
+    "grunt",
+
+    // Markdown & documentation
+    "rehype",
+    "remark",
+    "mdx",
+    "markdown",
+
+    // CSS & styling
+    "tailwind",
+    "css",
+    "sass",
+    "less",
+    "styled",
+    "emotion",
+
+    // UI libraries
+    "@radix-ui",
+    "@mui",
+    "@chakra-ui",
+    "@mantine",
+    "shadcn",
+    "ant",
+    "bootstrap",
+    "material",
+
+    // Types & TypeScript
+    "typescript",
+    "@types",
+    "type-",
+    "ts-",
+
+    // Testing
+    "jest",
+    "cypress",
+    "testing-library",
+    "vitest",
+    "mocha",
+    "chai",
+    "playwright",
+    "selenium",
+
+    // Linting & formatting
+    "eslint",
+    "prettier",
+    "lint",
+    "stylelint",
+
+    // Backend & servers
+    "express",
+    "fastify",
+    "nest",
+    "koa",
+    "hapi",
+    "node",
+    "apollo",
+    "graphql",
+
+    // Databases & ORM
+    "prisma",
+    "sequelize",
+    "typeorm",
+    "mongoose",
+    "knex",
+    "drizzle",
+    "postgres",
+    "mongo",
+    "mysql",
+    "sqlite",
+
+    // State management
+    "redux",
+    "zustand",
+    "jotai",
+    "recoil",
+    "mobx",
+    "pinia",
+    "vuex",
+    "ngrx",
+    "xstate",
+
+    // Utilities
+    "lodash",
+    "date-fns",
+    "dayjs",
+    "moment",
+    "axios",
+    "zod",
+    "yup",
+    "formik",
+    "swr",
+    "tanstack",
+    "i18n",
+
+    // Cloud & deployment
+    "aws",
+    "azure",
+    "gcp",
+    "cloudflare",
+    "vercel",
+    "netlify",
+    "firebase",
+    "supabase",
+    "amplify",
+
+    // Bundled scopes
+    "@aws-sdk",
+    "@azure/",
+    "@google-cloud",
+    "@firebase",
+    "@stripe",
+    "@clerk",
+    "@tanstack",
+    "@trpc",
+  ];
+
+  // Create mapping of normalized names to original names
+  const normalizedToOriginal: Record<string, string> = {};
+  techItems.forEach((item) => {
+    let normalized = item.name
+      .toLowerCase()
+      .replace(/\.js$/, "")
+      .replace(/-js$/, "");
+
+    // Store scope for scoped packages
+    if (normalized.startsWith("@")) {
+      const scope = normalized.split("/")[0];
+      normalizedToOriginal[scope] = item.name;
+    }
+
+    normalizedToOriginal[normalized] = item.name;
+  });
+
+  // Identify main technologies (group leaders)
+  for (const prefix of commonPrefixes) {
+    const exactMatch = techItems.find((item) => {
+      const name = item.name.toLowerCase();
+      return (
+        name === prefix || name === prefix + ".js" || name === prefix + "js"
+      );
+    });
+
+    if (exactMatch) {
+      // Create a group with the original casing
+      groups[exactMatch.name] = [exactMatch];
+    } else {
+      // Check for scope matches or similar
+      for (const [normalized, original] of Object.entries(
+        normalizedToOriginal
+      )) {
+        if (
+          normalized === prefix ||
+          (prefix.startsWith("@") && normalized === prefix) ||
+          normalized === prefix + ".js" ||
+          normalized === prefix + "js"
+        ) {
+          const item = techItems.find((i) => i.name === original);
+          if (item) {
+            groups[item.name] = [item];
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Assign technologies to respective groups
+  techItems.forEach((item) => {
+    if (
+      Object.values(groups).some(
+        (groupItems) =>
+          groupItems.length === 1 && groupItems[0].name === item.name
+      )
+    ) {
+      return;
+    }
+
+    const itemName = item.name.toLowerCase();
+    let matched = false;
+
+    // Check each prefix
+    for (const prefix of commonPrefixes) {
+      // Watch for short prefixes that could cause false grouping
+      if (prefix.length < 3 && !prefix.startsWith("@")) continue;
+
+      // Check for prefix match or scope/package match
+      if (
+        itemName.startsWith(prefix + "-") ||
+        itemName.startsWith(prefix + "/") ||
+        itemName.startsWith("@" + prefix + "/") ||
+        itemName === prefix ||
+        (itemName.includes(prefix) &&
+          // Special cases that need more context
+          ((prefix === "react" &&
+            (itemName.includes("react-") ||
+              itemName.includes("-react") ||
+              itemName.includes("react/"))) ||
+            (prefix === "vue" &&
+              (itemName.includes("vue-") ||
+                itemName.includes("-vue") ||
+                itemName.includes("vue/")))))
+      ) {
+        // Find group for item
+        let foundGroup = false;
+        for (const [groupName, groupItems] of Object.entries(groups)) {
+          const groupNameLower = groupName.toLowerCase();
+          if (
+            groupNameLower === prefix ||
+            groupNameLower === prefix + ".js" ||
+            groupNameLower === prefix + "js" ||
+            groupNameLower === "@" + prefix
+          ) {
+            groupItems.push(item);
+            foundGroup = true;
+            matched = true;
+            break;
+          }
+        }
+
+        // If no group exist --> create a new one
+        if (
+          !foundGroup &&
+          (itemName.startsWith(prefix + "-") ||
+            itemName.startsWith(prefix + "/") ||
+            itemName.startsWith("@" + prefix + "/"))
+        ) {
+          groups[item.name] = [item];
+          matched = true;
+        }
+
+        if (matched) break;
+      }
+    }
+
+    // Special handling (not matched by prefix)
+    if (!matched) {
+      // remark/rehype plugins
+      if (itemName.startsWith("rehype-") || itemName.startsWith("remark-")) {
+        const family = itemName.split("-")[0]; // 'rehype' or 'remark'
+
+        let familyGroup = Object.entries(groups).find(
+          ([name]) => name.toLowerCase() === family
+        );
+
+        if (familyGroup) {
+          familyGroup[1].push(item);
+        } else {
+          const displayName = family.charAt(0).toUpperCase() + family.slice(1);
+          groups[displayName] = [item];
+        }
+        matched = true;
+      }
+
+      // @types packages
+      if (itemName.startsWith("@types/")) {
+        const targetPackage = itemName.slice(7);
+
+        // Look for the main package in existing groups
+        for (const [groupName, groupItems] of Object.entries(groups)) {
+          if (groupName.toLowerCase() === targetPackage) {
+            groupItems.push(item);
+            matched = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Add ungrouped items as single item group
+    if (!matched) {
+      groups[item.name] = [item];
+    }
+  });
+
+  // Filter out single item groups
+  const filteredGroups: { [key: string]: TechItem[] } = {};
+
+  Object.entries(groups).forEach(([key, items]) => {
+    if (items.length > 1) {
+      filteredGroups[key] = items;
+    }
+  });
+
+  return filteredGroups;
+}
+
+// Analyze repository
 export async function analyzeRepository(
   owner: string,
   repo: string
@@ -364,9 +735,9 @@ export async function analyzeRepository(
   const languages: TechItem[] = [];
   const frameworks: TechItem[] = [];
   const apis: TechItem[] = [];
-  const resources: TechItem[] = []; // General bucket for tools, testing, etc.
+  const resources: TechItem[] = [];
 
-  const detectedTechNames = new Set<string>(); // To avoid duplicates by name
+  const detectedTechNames = new Set<string>();
 
   const addTechItem = (
     category: TechItem[],
@@ -380,7 +751,7 @@ export async function analyzeRepository(
     detectedTechNames.add(lowerName);
   };
 
-  // 1. Get Languages from GitHub API
+  // Get Languages from GitHub API
   const langData = await fetchGitHubApi<Record<string, number>>(
     `${GITHUB_API_BASE}/repos/${owner}/${repo}/languages`
   );
@@ -395,7 +766,7 @@ export async function analyzeRepository(
     addTechItem(languages, repoInfoData.language);
   }
 
-  // 2. Analyze package.json (if exists)
+  // Analyze package.json (if exists)
   const packageJsonContent = await fetchFileContent(
     owner,
     repo,
@@ -434,8 +805,7 @@ export async function analyzeRepository(
           categorized = true;
         }
 
-        // If it's a known @scope, sometimes good to list the scope itself if specific items aren't matched
-        // e.g. @radix-ui, @tailwindcss
+        // List scope if it's a known @scope
         if (!categorized && depName.startsWith("@")) {
           const scope = depName.split("/")[0];
           if (K.FRAMEWORKS_LIBS.some((kw) => scope.includes(kw))) {
@@ -452,7 +822,7 @@ export async function analyzeRepository(
     }
   }
 
-  // 3. Basic README Scan (very simplistic for now)
+  // README Scan
   if (repoInfoData.readme) {
     const readmeLower = repoInfoData.readme.toLowerCase();
     if (readmeLower.includes("next.js")) addTechItem(frameworks, "Next.js");
@@ -462,9 +832,25 @@ export async function analyzeRepository(
     if (readmeLower.includes("docker")) addTechItem(resources, "Docker");
     if (readmeLower.includes("openai api") || readmeLower.includes("gpt-"))
       addTechItem(apis, "OpenAI API", "openai");
+
+    // Detect media files mentioned in README
+    const imageRegex =
+      /\.(png|jpg|jpeg|gif|svg|pdf|mp4|webm|mp3)(\?[^\s)]+)?(?=\s|\)|"|'|$)/gi;
+    const mediaMatches = readmeLower.match(imageRegex);
+    if (mediaMatches && mediaMatches.length > 0) {
+      addTechItem(resources, "Media Files");
+    }
+
+    // Check for GitHub user attachments or external media in README
+    const urlRegex =
+      /(https?:\/\/[^\s)]+\.(png|jpg|jpeg|gif|svg|pdf|mp4|webm|mp3)(\?[^\s)]+)?)/gi;
+    const mediaUrls = readmeLower.match(urlRegex);
+    if (mediaUrls && mediaUrls.length > 0) {
+      mediaUrls.forEach((url) => {});
+    }
   }
 
-  // Fallback for primary language if not caught by specific language list from API but present in repoInfo
+  // Fallback for primary language (shown in repoInfo)
   if (
     repoInfoData.language &&
     repoInfoData.language !== "Not specified" &&
@@ -475,8 +861,7 @@ export async function analyzeRepository(
     addTechItem(languages, repoInfoData.language);
   }
 
-  // Ensure critical self-identified tech (from user's package.json example) is present if missed
-  // This is a bit of a hack; ideally, categorization should catch them.
+  // Self-identified tech (really rough bruh but it will do for now)
   const projectOwnDeps = [
     "react",
     "tailwindcss",
@@ -498,6 +883,12 @@ export async function analyzeRepository(
     });
   }
 
+  // Create grouped technology items
+  const groupedLanguages = groupRelatedTechnologies(languages);
+  const groupedFrameworks = groupRelatedTechnologies(frameworks);
+  const groupedApis = groupRelatedTechnologies(apis);
+  const groupedResources = groupRelatedTechnologies(resources);
+
   return {
     languages: [
       ...new Map(
@@ -517,6 +908,12 @@ export async function analyzeRepository(
         resources.map((item) => [item.name.toLowerCase(), item])
       ).values(),
     ],
+    groupedTech: {
+      languages: groupedLanguages,
+      frameworks: groupedFrameworks,
+      apis: groupedApis,
+      resources: groupedResources,
+    },
     repoInfo: repoInfoData,
   };
 }
