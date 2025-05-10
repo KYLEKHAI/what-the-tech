@@ -15,7 +15,7 @@ const Navbar = () => {
               alt="What the Tech Logo"
               className="h-16 w-16 mr-4"
             />
-            What the Tech
+            What the Tech!
           </a>
         </div>
 
