@@ -1,5 +1,5 @@
 // src/analyzer.ts
-import { getTechIcon } from "./components/IconMap";
+import { getDevIcon } from "./components/DevIconMap";
 
 // Re-define types here or import from a shared types.ts if you create one
 // For now, co-locating simplified versions or assuming they are available globally for snippet.
@@ -376,7 +376,7 @@ export async function analyzeRepository(
     const lowerName = name.toLowerCase();
     if (detectedTechNames.has(lowerName)) return;
 
-    category.push({ name: name, icon: getTechIcon(rawName || name) });
+    category.push({ name: name, icon: getDevIcon(rawName || name) });
     detectedTechNames.add(lowerName);
   };
 
