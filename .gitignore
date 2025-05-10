@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 cursor.txt
+
+# Local Environment Variables
+.env.local
+.env.*.local

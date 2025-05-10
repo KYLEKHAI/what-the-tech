@@ -1,4 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import {
+  analyzeRepository,
+  type TechData as AnalyzerTechData,
+  type RepoInfo as AnalyzerRepoInfo,
+  type TechItem as AnalyzerTechItem,
+} from "./analyzer"; // Import the analyzer
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -26,6 +32,9 @@ import {
   GitBranch,
   FolderGit,
   Copyright,
+  X,
+  ChevronRight,
+  Sparkles,
 } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,40 +51,9 @@ import "highlight.js/styles/github.css";
 import "./App.css";
 import Navbar from "./components/Navbar";
 
-// Define data types
-interface TechItem {
-  name: string;
-  icon: string;
-  color: string;
-}
+interface TechItem extends AnalyzerTechItem {}
 
-interface RepoInfo {
-  name: string;
-  owner: string;
-  description: string;
-  stars: number;
-  forks: number;
-  watchers: number;
-  issues: number;
-  createdAt: string;
-  updatedAt: string;
-  readme?: string;
-  licenseInfo?: string;
-  language?: string;
-  topics?: string[];
-  collaborators?: { login: string; avatar_url: string }[];
-  branches?: string[];
-  defaultBranch?: string;
-  releases?: {
-    name: string;
-    tag_name: string;
-    published_at: string;
-    url: string;
-  }[];
-  packages?: { name: string; package_type: string; html_url: string }[];
-  homepage?: string;
-  website?: string;
-}
+interface RepoInfo extends AnalyzerRepoInfo {}
 
 interface TechData {
   languages: TechItem[];
@@ -83,174 +61,127 @@ interface TechData {
   apis: TechItem[];
   resources: TechItem[];
   repoInfo: RepoInfo;
+  groupedTech?: {
+    languages: { [key: string]: TechItem[] };
+    frameworks: { [key: string]: TechItem[] };
+    apis: { [key: string]: TechItem[] };
+    resources: { [key: string]: TechItem[] };
+  };
 }
 
-// Tech stack data (ROUGH MOCK DATA)
-const mockTechData: TechData = {
-  languages: [
-    { name: "Python", icon: "🐍", color: "bg-blue-100 border-blue-400" },
-    {
-      name: "JavaScript",
-      icon: "🟨",
-      color: "bg-yellow-100 border-yellow-400",
-    },
-    { name: "TypeScript", icon: "🔷", color: "bg-blue-100 border-blue-400" },
-  ],
-  frameworks: [
-    { name: "React", icon: "⚛️", color: "bg-blue-100 border-blue-400" },
-    { name: "Next.js", icon: "▲", color: "bg-slate-100 border-slate-400" },
-    { name: "TailwindCSS", icon: "🌊", color: "bg-cyan-100 border-cyan-400" },
-    { name: "shadcn/ui", icon: "🎨", color: "bg-slate-100 border-slate-400" },
-  ],
-  apis: [
-    {
-      name: "GitHub API",
-      icon: "🐙",
-      color: "bg-purple-100 border-purple-400",
-    },
-    { name: "REST API", icon: "🔄", color: "bg-green-100 border-green-400" },
-  ],
-  resources: [
-    { name: "Font Awesome", icon: "🔤", color: "bg-red-100 border-red-400" },
-    { name: "Google Fonts", icon: "🔠", color: "bg-blue-100 border-blue-400" },
-    { name: "Unsplash", icon: "📸", color: "bg-gray-100 border-gray-400" },
-  ],
-  repoInfo: {
-    name: "what-the-tech",
-    owner: "KYLEKHAI",
-    description:
-      "A tool to analyze GitHub repositories and discover their tech stack",
-    stars: 42,
-    forks: 8,
-    watchers: 5,
-    issues: 3,
-    createdAt: "2023-08-15",
-    updatedAt: "2024-02-22",
-  },
+// Group Modal Component
+interface GroupModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  groupName: string;
+  items: TechItem[];
+}
+
+const GroupModal = ({ isOpen, onClose, groupName, items }: GroupModalProps) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(event.target as Node)
+      ) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div
+        ref={modalRef}
+        className="relative bg-white dark:bg-gray-900 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-xl"
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Sparkles size={20} className="text-blue-500" />
+            <span>{groupName} Family</span>
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-6 overflow-auto max-h-[calc(80vh-60px)]">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            {items.length} technologies related to {groupName}:
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {items.map((item) => (
+              <Card
+                key={item.name}
+                className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
+              >
+                <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+                  <div className="mb-2 flex justify-center items-center h-10 w-10">
+                    {item.icon}
+                  </div>
+                  <h3 className="font-medium text-sm">{item.name}</h3>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
-// Function to fetch GitHub repository data
-const fetchGitHubRepo = async (
-  owner: string,
-  repo: string
-): Promise<RepoInfo | null> => {
-  try {
-    // Fetch repository information
-    const repoResponse = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}`
-    );
+// Stacked Card (for grouped items)
+interface StackedCardProps {
+  groupKey: string;
+  items: TechItem[];
+  onClick: () => void;
+}
 
-    if (!repoResponse.ok) {
-      throw new Error(`GitHub API error: ${repoResponse.status}`);
-    }
+const StackedCard = ({ groupKey, items, onClick }: StackedCardProps) => {
+  // Display main item in the stacked card
+  const mainItem = items[0];
+  const itemCount = items.length;
 
-    const repoData = await repoResponse.json();
+  return (
+    <div className="relative cursor-pointer" onClick={onClick}>
+      {/* Background cards for stacked effect */}
+      <div className="absolute -right-1 -bottom-1 w-full h-full bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
+      <div className="absolute -right-0.5 -bottom-0.5 w-full h-full bg-gray-100 dark:bg-gray-800 rounded-xl"></div>
 
-    // Fetch README content
-    const readmeResponse = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/readme`
-    );
-    let readmeContent = "";
-
-    if (readmeResponse.ok) {
-      const readmeData = await readmeResponse.json();
-      // Base64 decode the README content
-      readmeContent = atob(readmeData.content);
-    }
-
-    // Fetch contributors/collaborators
-    const contributorsResponse = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/contributors`
-    );
-    let collaborators = [];
-
-    if (contributorsResponse.ok) {
-      collaborators = await contributorsResponse.json();
-    }
-
-    // Fetch branches
-    const branchesResponse = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/branches`
-    );
-    let branches = [];
-
-    if (branchesResponse.ok) {
-      const branchesData = await branchesResponse.json();
-      branches = branchesData.map((branch: any) => branch.name);
-    }
-
-    // Fetch releases
-    const releasesResponse = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/releases`
-    );
-    let releases = [];
-
-    if (releasesResponse.ok) {
-      const releasesData = await releasesResponse.json();
-      releases = releasesData.map((release: any) => ({
-        name: release.name || release.tag_name,
-        tag_name: release.tag_name,
-        published_at: new Date(release.published_at).toLocaleDateString(),
-        url: release.html_url,
-      }));
-    }
-
-    // Fetch packages
-    const packagesResponse = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/packages`
-    );
-    let packages = [];
-
-    if (packagesResponse.ok) {
-      const packagesData = await packagesResponse.json();
-      packages = packagesData.map((pkg: any) => ({
-        name: pkg.name,
-        package_type: pkg.package_type,
-        html_url: pkg.html_url,
-      }));
-    }
-
-    // Extract homepage URL
-    const homepage = repoData.homepage;
-
-    // Look for website links in description or readme
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const descriptionLinks = repoData.description
-      ? repoData.description.match(urlRegex)
-      : null;
-    const website =
-      descriptionLinks && descriptionLinks.length > 0
-        ? descriptionLinks[0]
-        : null;
-
-    return {
-      name: repoData.name,
-      owner: repoData.owner.login,
-      description: repoData.description || "No description provided",
-      stars: repoData.stargazers_count,
-      forks: repoData.forks_count,
-      watchers: repoData.watchers_count,
-      issues: repoData.open_issues_count,
-      createdAt: new Date(repoData.created_at).toLocaleDateString(),
-      updatedAt: new Date(repoData.updated_at).toLocaleDateString(),
-      readme: readmeContent,
-      licenseInfo: repoData.license
-        ? repoData.license.name
-        : "No license information",
-      language: repoData.language || "Not specified",
-      topics: repoData.topics || [],
-      collaborators: collaborators.slice(0, 10),
-      branches: branches,
-      defaultBranch: repoData.default_branch,
-      releases: releases.slice(0, 5),
-      packages: packages.slice(0, 5),
-      homepage: homepage,
-      website: website,
-    };
-  } catch (error) {
-    console.error("Error fetching GitHub data:", error);
-    return null;
-  }
+      {/* Main card */}
+      <Card className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all relative z-10">
+        <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+          <div className="mb-2 flex justify-center items-center h-10 w-10">
+            {mainItem.icon}
+          </div>
+          <h3 className="font-medium text-sm flex items-center gap-1">
+            {mainItem.name}
+            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full px-2 py-0.5">
+              +{itemCount - 1}
+            </span>
+          </h3>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center">
+            <span>View all</span>
+            <ChevronRight className="w-3 h-3 ml-1" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 };
 
 function App() {
@@ -260,9 +191,77 @@ function App() {
   const [techData, setTechData] = useState<TechData | null>(null);
   const [activeTab, setActiveTab] = useState("tech");
   const [readmeView, setReadmeView] = useState("rendered");
+  const [activeSection, setActiveSection] = useState<string>("languages");
+
+  // Refs for navigation menu
+  const languagesRef = useRef<HTMLDivElement>(null);
+  const frameworksRef = useRef<HTMLDivElement>(null);
+  const apisRef = useRef<HTMLDivElement>(null);
+  const resourcesRef = useRef<HTMLDivElement>(null);
+
+  // Tech group modal state
+  const [selectedGroup, setSelectedGroup] = useState<{
+    name: string;
+    items: TechItem[];
+  } | null>(null);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+
+  // Function to scroll to section
+  const scrollToSection = (section: string) => {
+    setActiveSection(section);
+
+    const refMap = {
+      languages: languagesRef,
+      frameworks: frameworksRef,
+      apis: apisRef,
+      resources: resourcesRef,
+    };
+
+    const ref = refMap[section as keyof typeof refMap];
+    if (ref?.current) {
+      // Resource section different offset due to being last section
+      const yOffset = section === "resources" ? -150 : -90;
+      const element = ref.current;
+      const y = element.getBoundingClientRect().top + window.scrollY + yOffset;
+
+      window.scrollTo({
+        top: y,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  // Navigation menu active selection based on scroll
+  useEffect(() => {
+    if (!techData) return;
+
+    const handleScroll = () => {
+      const sections = [
+        { id: "languages", ref: languagesRef },
+        { id: "frameworks", ref: frameworksRef },
+        { id: "apis", ref: apisRef },
+        { id: "resources", ref: resourcesRef },
+      ];
+
+      for (const section of sections) {
+        if (!section.ref.current) continue;
+
+        const rect = section.ref.current.getBoundingClientRect();
+        if (rect.top <= 120 && rect.bottom >= 120) {
+          setActiveSection(section.id);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [techData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e?.preventDefault();
+    e.preventDefault();
 
     if (!url) {
       setError("Please enter a GitHub repository URL");
@@ -287,23 +286,18 @@ function App() {
     }
 
     try {
-      // Fetch real GitHub data
-      const repoInfo = await fetchGitHubRepo(
+      // Use analyzer function to fetch and process data
+      const analysisResult = await analyzeRepository(
         repoDetails.owner,
         repoDetails.repo
       );
 
-      if (!repoInfo) {
+      if (!analysisResult) {
         throw new Error("Failed to fetch repository information");
       }
 
-      // Update tech data with fetched repo info
-      const updatedTechData = {
-        ...mockTechData,
-        repoInfo,
-      };
-
-      setTechData(updatedTechData);
+      // Set the fetched and analyzed data
+      setTechData(analysisResult);
       setIsLoading(false);
     } catch (err) {
       setError(
@@ -330,10 +324,100 @@ function App() {
     }
   };
 
+  // Function to handle group card click
+  const handleGroupClick = (groupName: string, items: TechItem[]) => {
+    setSelectedGroup({ name: groupName, items });
+    setIsGroupModalOpen(true);
+  };
+
+  // Modified render functions for each tech section to include refs and IDs
+  const renderTechSection = (
+    title: string,
+    icon: React.ReactNode,
+    items: TechItem[],
+    groupedItems: { [key: string]: TechItem[] } | undefined,
+    ref: React.RefObject<HTMLDivElement | null>,
+    sectionId: string
+  ) => {
+    // Array of items not in groupedItems
+    const nonGroupedItems = items.filter((item) => {
+      if (!groupedItems) return true;
+      return !Object.values(groupedItems)
+        .flat()
+        .some(
+          (groupItem) =>
+            groupItem.name === item.name &&
+            // Exclude if it's the main item of group
+            !Object.entries(groupedItems).some(
+              ([key, groupItems]) => groupItems[0].name === item.name
+            )
+        );
+    });
+
+    return (
+      <div ref={ref} id={sectionId}>
+        <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
+          <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
+            <div className="flex items-center">
+              {icon}
+              <CardTitle>{title}</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6 pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {/* Render grouped items first */}
+              {groupedItems &&
+                Object.entries(groupedItems).map(([key, groupItems]) => (
+                  <StackedCard
+                    key={key}
+                    groupKey={key}
+                    items={groupItems}
+                    onClick={() => handleGroupClick(key, groupItems)}
+                  />
+                ))}
+
+              {/* Render non-grouped items */}
+              {nonGroupedItems.map((item) => (
+                <Card
+                  key={item.name}
+                  className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
+                >
+                  <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+                    <div className="mb-2 flex justify-center items-center h-10 w-10">
+                      {item.icon}
+                    </div>
+                    <h3 className="font-medium text-sm">{item.name}</h3>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {items.length === 0 && (
+                <div className="col-span-full text-center text-gray-500 dark:text-gray-400 py-4">
+                  No {title.toLowerCase()} detected
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white">
+    <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-      <main className="min-h-screen flex flex-col items-center justify-start px-4 pt-24 pb-16 bg-white dark:bg-black text-gray-900 dark:text-white">
+
+      {/* Group Modal */}
+      {selectedGroup && (
+        <GroupModal
+          isOpen={isGroupModalOpen}
+          onClose={() => setIsGroupModalOpen(false)}
+          groupName={selectedGroup.name}
+          items={selectedGroup.items}
+        />
+      )}
+
+      <main className="flex-1 flex flex-col items-center justify-start px-4 pt-24 pb-16 bg-white dark:bg-black text-gray-900 dark:text-white">
         <h1 className="text-4xl md:text-5xl font-bold mb-4">What the Tech!</h1>
 
         <p className="text-lg mb-10 max-w-xl leading-relaxed text-center">
@@ -460,7 +544,8 @@ function App() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="text-center">
                     <div className="text-lg font-semibold flex items-center justify-center gap-1">
-                      <Star className="w-5 h-5" /> {techData?.repoInfo.stars}
+                      <Star className="w-5 h-5 text-yellow-500" />{" "}
+                      {techData?.repoInfo.stars}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       Stars
@@ -468,7 +553,8 @@ function App() {
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-semibold flex items-center justify-center gap-1">
-                      <GitFork className="w-5 h-5" /> {techData?.repoInfo.forks}
+                      <GitFork className="w-5 h-5 text-orange-500" />{" "}
+                      {techData?.repoInfo.forks}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       Forks
@@ -476,7 +562,8 @@ function App() {
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-semibold flex items-center justify-center gap-1">
-                      <Eye className="w-5 h-5" /> {techData?.repoInfo.watchers}
+                      <Eye className="w-5 h-5 text-blue-500" />{" "}
+                      {techData?.repoInfo.watchers}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       Watchers
@@ -484,7 +571,8 @@ function App() {
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-semibold flex items-center justify-center gap-1">
-                      <Bug className="w-5 h-5" /> {techData?.repoInfo.issues}
+                      <Bug className="w-5 h-5 text-red-500" />{" "}
+                      {techData?.repoInfo.issues}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       Issues
@@ -523,110 +611,158 @@ function App() {
 
               {/* Technology Stack Tab Content */}
               {activeTab === "tech" && (
-                <div className="space-y-6">
-                  {/* Languages Section */}
-                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
-                      <div className="flex items-center">
-                        <Code className="mr-2 h-5 w-5" />
-                        <CardTitle>Languages</CardTitle>
+                <div className="relative">
+                  {/* Left side navigation (sticky) */}
+                  <div className="hidden md:block fixed left-8 top-1/2 transform -translate-y-1/2 w-40 z-10">
+                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 overflow-hidden shadow-md">
+                      <div className="py-2 px-3 border-b border-gray-100 dark:border-gray-800">
+                        <h3 className="text-sm font-medium text-center">
+                          Navigation Menu
+                        </h3>
                       </div>
-                    </CardHeader>
-                    <CardContent className="pt-6 pb-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {techData?.languages.map((lang) => (
-                          <Card
-                            key={lang.name}
-                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
-                          >
-                            <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                              <div className="text-3xl mb-2">{lang.icon}</div>
-                              <h3 className="font-medium">{lang.name}</h3>
-                            </CardContent>
-                          </Card>
-                        ))}
+                      <div className="p-2 space-y-1.5">
+                        <button
+                          onClick={() => scrollToSection("languages")}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            activeSection === "languages"
+                              ? "bg-white dark:bg-gray-800 font-medium shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <Code className="mr-2 h-4 w-4" />
+                            <span>Languages</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("frameworks")}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            activeSection === "frameworks"
+                              ? "bg-white dark:bg-gray-800 font-medium shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <Layers className="mr-2 h-4 w-4" />
+                            <span>Frameworks</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("apis")}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            activeSection === "apis"
+                              ? "bg-white dark:bg-gray-800 font-medium shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <Database className="mr-2 h-4 w-4" />
+                            <span>APIs</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("resources")}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            activeSection === "resources"
+                              ? "bg-white dark:bg-gray-800 font-medium shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <FileType className="mr-2 h-4 w-4" />
+                            <span>Resources</span>
+                          </div>
+                        </button>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
 
-                  {/* Frameworks Section */}
-                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
-                      <div className="flex items-center">
-                        <Layers className="mr-2 h-5 w-5" />
-                        <CardTitle>Frameworks & Libraries</CardTitle>
+                  {/* Mobile navigation */}
+                  <div className="md:hidden mb-6">
+                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 overflow-hidden">
+                      <div className="p-2 flex space-x-1">
+                        <button
+                          onClick={() => scrollToSection("languages")}
+                          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            activeSection === "languages"
+                              ? "bg-white dark:bg-gray-800 shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          Languages
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("frameworks")}
+                          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            activeSection === "frameworks"
+                              ? "bg-white dark:bg-gray-800 shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          Frameworks
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("apis")}
+                          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            activeSection === "apis"
+                              ? "bg-white dark:bg-gray-800 shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          APIs
+                        </button>
+                        <button
+                          onClick={() => scrollToSection("resources")}
+                          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            activeSection === "resources"
+                              ? "bg-white dark:bg-gray-800 shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
+                          }`}
+                        >
+                          Resources
+                        </button>
                       </div>
-                    </CardHeader>
-                    <CardContent className="pt-6 pb-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {techData?.frameworks.map((framework) => (
-                          <Card
-                            key={framework.name}
-                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
-                          >
-                            <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                              <div className="text-3xl mb-2">
-                                {framework.icon}
-                              </div>
-                              <h3 className="font-medium">{framework.name}</h3>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
 
-                  {/* APIs Section */}
-                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
-                      <div className="flex items-center">
-                        <Database className="mr-2 h-5 w-5" />
-                        <CardTitle>APIs</CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-6 pb-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {techData?.apis.map((api) => (
-                          <Card
-                            key={api.name}
-                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
-                          >
-                            <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                              <div className="text-3xl mb-2">{api.icon}</div>
-                              <h3 className="font-medium">{api.name}</h3>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {/* Main tech stack content */}
+                  <div className="space-y-6">
+                    {renderTechSection(
+                      "Languages",
+                      <Code className="mr-2 h-5 w-5" />,
+                      techData.languages,
+                      techData.groupedTech?.languages,
+                      languagesRef,
+                      "languages"
+                    )}
 
-                  {/* Resources Section */}
-                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
-                      <div className="flex items-center">
-                        <FileType className="mr-2 h-5 w-5" />
-                        <CardTitle>Resources</CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-6 pb-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {techData?.resources.map((resource) => (
-                          <Card
-                            key={resource.name}
-                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
-                          >
-                            <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                              <div className="text-3xl mb-2">
-                                {resource.icon}
-                              </div>
-                              <h3 className="font-medium">{resource.name}</h3>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                    {renderTechSection(
+                      "Frameworks & Libraries",
+                      <Layers className="mr-2 h-5 w-5" />,
+                      techData.frameworks,
+                      techData.groupedTech?.frameworks,
+                      frameworksRef,
+                      "frameworks"
+                    )}
+
+                    {renderTechSection(
+                      "APIs",
+                      <Database className="mr-2 h-5 w-5" />,
+                      techData.apis,
+                      techData.groupedTech?.apis,
+                      apisRef,
+                      "apis"
+                    )}
+
+                    {renderTechSection(
+                      "Resources",
+                      <FileType className="mr-2 h-5 w-5" />,
+                      techData.resources,
+                      techData.groupedTech?.resources,
+                      resourcesRef,
+                      "resources"
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -736,7 +872,7 @@ function App() {
                         </>
                       )}
 
-                      {/* Topics */}
+                      {/* Topics Section */}
                       {techData?.repoInfo.topics &&
                         techData.repoInfo.topics.length > 0 && (
                           <>
@@ -768,25 +904,19 @@ function App() {
                               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center justify-center gap-1 mb-3">
                                 <Tag className="w-4 h-4" /> Releases
                               </h3>
-                              <div className="flex flex-col items-center gap-2">
+                              <div className="flex flex-wrap justify-center gap-3">
                                 {techData.repoInfo.releases.map((release) => (
                                   <a
                                     key={release.tag_name}
                                     href={release.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg w-full max-w-md transition-colors"
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md text-sm transition-colors"
                                   >
                                     <Tag className="w-4 h-4 flex-shrink-0" />
-                                    <div className="flex-1 text-left">
-                                      <div className="font-medium">
-                                        {release.name}
-                                      </div>
-                                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        {release.tag_name} •{" "}
-                                        {release.published_at}
-                                      </div>
-                                    </div>
+                                    <span>
+                                      {release.name || release.tag_name}
+                                    </span>
                                     <ExternalLink className="w-3 h-3 flex-shrink-0" />
                                   </a>
                                 ))}
@@ -804,24 +934,17 @@ function App() {
                               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center justify-center gap-1 mb-3">
                                 <Package className="w-4 h-4" /> Packages
                               </h3>
-                              <div className="flex flex-col items-center gap-2">
+                              <div className="flex flex-wrap justify-center gap-3">
                                 {techData.repoInfo.packages.map((pkg) => (
                                   <a
                                     key={pkg.name}
                                     href={pkg.html_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg w-full max-w-md transition-colors"
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md text-sm transition-colors"
                                   >
                                     <Package className="w-4 h-4 flex-shrink-0" />
-                                    <div className="flex-1 text-left">
-                                      <div className="font-medium">
-                                        {pkg.name}
-                                      </div>
-                                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        {pkg.package_type}
-                                      </div>
-                                    </div>
+                                    <span>{pkg.name}</span>
                                     <ExternalLink className="w-3 h-3 flex-shrink-0" />
                                   </a>
                                 ))}
@@ -865,19 +988,24 @@ function App() {
                               <div className="flex flex-wrap justify-center gap-2">
                                 {techData.repoInfo.collaborators.map(
                                   (collaborator) => (
-                                    <div
+                                    <a
                                       key={collaborator.login}
-                                      className="flex flex-col items-center"
+                                      href={`https://github.com/${collaborator.login}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex flex-col items-center hover:opacity-80 transition-all group"
                                     >
-                                      <img
-                                        src={collaborator.avatar_url}
-                                        alt={collaborator.login}
-                                        className="w-10 h-10 rounded-full"
-                                      />
-                                      <span className="text-xs mt-1">
+                                      <div className="relative">
+                                        <img
+                                          src={collaborator.avatar_url}
+                                          alt={collaborator.login}
+                                          className="w-10 h-10 rounded-full group-hover:ring-2 group-hover:ring-black dark:group-hover:ring-white transition-all"
+                                        />
+                                      </div>
+                                      <span className="text-xs mt-1 text-gray-800 dark:text-gray-200">
                                         {collaborator.login}
                                       </span>
-                                    </div>
+                                    </a>
                                   )
                                 )}
                               </div>
@@ -985,6 +1113,21 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-200 dark:border-gray-800 py-8 w-full bg-white dark:bg-black">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col items-center">
+            <p className="text-gray-500 dark:text-gray-400 mb-2">
+              What The Tech!
+            </p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              Kyle Khai Tran | 2025
+            </p>
+            <div className="h-6"></div> {/* Small extra space */}
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
