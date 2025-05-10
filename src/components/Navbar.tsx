@@ -8,8 +8,13 @@ const Navbar = () => {
         <div className="flex items-center">
           <a
             href="/"
-            className="text-xl font-bold text-gray-900 dark:text-white transition-transform duration-300 hover:-rotate-2 hover:scale-110"
+            className="flex items-center text-xl font-bold text-gray-900 dark:text-white transition-transform duration-300 hover:-rotate-2 hover:scale-110"
           >
+            <img
+              src="/what-the-stack-logo-tp.png"
+              alt="What the Tech Logo"
+              className="h-16 w-16 mr-4"
+            />
             What the Tech
           </a>
         </div>
