@@ -42,7 +42,7 @@ import "highlight.js/styles/github.css";
 import "./App.css";
 import Navbar from "./components/Navbar";
 
-// Define types for our data
+// Define data types
 interface TechItem {
   name: string;
   icon: string;
@@ -85,7 +85,7 @@ interface TechData {
   repoInfo: RepoInfo;
 }
 
-// Tech stack data - this would come from your web scraping API
+// Tech stack data (ROUGH MOCK DATA)
 const mockTechData: TechData = {
   languages: [
     { name: "Python", icon: "🐍", color: "bg-blue-100 border-blue-400" },
@@ -331,9 +331,9 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white">
+    <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white">
       <Navbar />
-      <main className="min-h-screen flex flex-col items-center justify-start px-4 pt-24 pb-16 bg-white dark:bg-gray-950 text-gray-900 dark:text-white">
+      <main className="min-h-screen flex flex-col items-center justify-start px-4 pt-24 pb-16 bg-white dark:bg-black text-gray-900 dark:text-white">
         <h1 className="text-4xl md:text-5xl font-bold mb-4">What the Tech!</h1>
 
         <p className="text-lg mb-10 max-w-xl leading-relaxed text-center">
@@ -351,7 +351,7 @@ function App() {
         </p>
 
         {!techData ? (
-          <Card className="w-full max-w-xl border border-gray-200 dark:border-gray-800 shadow-sm rounded-xl">
+          <Card className="w-full max-w-xl border border-gray-200 dark:border-white/20 shadow-sm rounded-xl">
             <CardContent className="pt-6 pb-8 px-6 md:px-8">
               {/* GitHub Header */}
               <div className="flex items-center justify-center mb-6">
@@ -373,7 +373,7 @@ function App() {
                       <Search className="h-5 w-5 text-gray-400" />
                     </div>
                     <Input
-                      className="w-full pl-12 pr-4 py-6 text-base border-2 border-gray-200 dark:border-gray-700 hover:border-black dark:hover:border-gray-500 transition-colors duration-200"
+                      className="w-full pl-12 pr-4 py-6 text-base border-2 border-gray-200 dark:border-white/30 hover:border-black dark:hover:border-white/50 transition-colors duration-200"
                       placeholder="https://github.com/username/repository"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
@@ -424,12 +424,12 @@ function App() {
         ) : (
           <div className="w-full max-w-4xl">
             {/* Repository Info */}
-            <Card className="mb-6 border border-gray-200 dark:border-gray-800 shadow-sm rounded-xl overflow-hidden">
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+            <Card className="mb-6 border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
+              <div className="bg-white dark:bg-transparent px-6 py-5 border-b border-gray-200 dark:border-white/20">
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-center space-x-3">
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-300">
                         {techData?.repoInfo.owner}/{techData?.repoInfo.name}
                       </h2>
                       <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -525,8 +525,8 @@ function App() {
               {activeTab === "tech" && (
                 <div className="space-y-6">
                   {/* Languages Section */}
-                  <Card className="border border-gray-200 dark:border-gray-800 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-gray-800">
+                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
+                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
                       <div className="flex items-center">
                         <Code className="mr-2 h-5 w-5" />
                         <CardTitle>Languages</CardTitle>
@@ -537,7 +537,7 @@ function App() {
                         {techData?.languages.map((lang) => (
                           <Card
                             key={lang.name}
-                            className="border border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-md transition-all"
+                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
                           >
                             <CardContent className="flex flex-col items-center justify-center p-4 text-center">
                               <div className="text-3xl mb-2">{lang.icon}</div>
@@ -550,8 +550,8 @@ function App() {
                   </Card>
 
                   {/* Frameworks Section */}
-                  <Card className="border border-gray-200 dark:border-gray-800 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-gray-800">
+                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
+                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
                       <div className="flex items-center">
                         <Layers className="mr-2 h-5 w-5" />
                         <CardTitle>Frameworks & Libraries</CardTitle>
@@ -562,7 +562,7 @@ function App() {
                         {techData?.frameworks.map((framework) => (
                           <Card
                             key={framework.name}
-                            className="border border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-md transition-all"
+                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
                           >
                             <CardContent className="flex flex-col items-center justify-center p-4 text-center">
                               <div className="text-3xl mb-2">
@@ -577,8 +577,8 @@ function App() {
                   </Card>
 
                   {/* APIs Section */}
-                  <Card className="border border-gray-200 dark:border-gray-800 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-gray-800">
+                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
+                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
                       <div className="flex items-center">
                         <Database className="mr-2 h-5 w-5" />
                         <CardTitle>APIs</CardTitle>
@@ -589,7 +589,7 @@ function App() {
                         {techData?.apis.map((api) => (
                           <Card
                             key={api.name}
-                            className="border border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-md transition-all"
+                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
                           >
                             <CardContent className="flex flex-col items-center justify-center p-4 text-center">
                               <div className="text-3xl mb-2">{api.icon}</div>
@@ -602,8 +602,8 @@ function App() {
                   </Card>
 
                   {/* Resources Section */}
-                  <Card className="border border-gray-200 dark:border-gray-800 shadow-sm rounded-xl overflow-hidden">
-                    <CardHeader className="py-4 border-b border-gray-200 dark:border-gray-800">
+                  <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl overflow-hidden">
+                    <CardHeader className="py-4 border-b border-gray-200 dark:border-white/20 card-header">
                       <div className="flex items-center">
                         <FileType className="mr-2 h-5 w-5" />
                         <CardTitle>Resources</CardTitle>
@@ -614,7 +614,7 @@ function App() {
                         {techData?.resources.map((resource) => (
                           <Card
                             key={resource.name}
-                            className="border border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-md transition-all"
+                            className="border border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:shadow-md transition-all"
                           >
                             <CardContent className="flex flex-col items-center justify-center p-4 text-center">
                               <div className="text-3xl mb-2">
@@ -632,8 +632,8 @@ function App() {
 
               {/* Repository Details Tab Content */}
               {activeTab === "details" && (
-                <Card className="border border-gray-200 dark:border-gray-800 shadow-sm rounded-xl">
-                  <CardHeader className="flex justify-center">
+                <Card className="border border-gray-200 dark:border-white/20 shadow-sm rounded-xl">
+                  <CardHeader className="flex justify-center card-header">
                     <CardTitle>Repository Details</CardTitle>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center">
@@ -919,7 +919,7 @@ function App() {
                             </div>
 
                             {readmeView === "rendered" ? (
-                              <div className="prose dark:prose-invert max-w-none border rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
+                              <div className="prose dark:prose-invert max-w-none border rounded-lg p-4 bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-white/20">
                                 <ReactMarkdown
                                   remarkPlugins={[
                                     remarkGfm,
@@ -957,7 +957,7 @@ function App() {
                                 </ReactMarkdown>
                               </div>
                             ) : (
-                              <pre className="bg-gray-50 dark:bg-gray-900 p-4 rounded-md overflow-auto whitespace-pre-wrap raw-markdown border">
+                              <pre className="bg-gray-50 dark:bg-gray-900 p-4 rounded-md overflow-auto whitespace-pre-wrap raw-markdown border border-gray-200 dark:border-white/20">
                                 {techData.repoInfo.readme}
                               </pre>
                             )}
@@ -973,7 +973,7 @@ function App() {
             {/* Re-scan repository button */}
             <div className="mt-8 text-center">
               <Button
-                variant="outline"
+                className="bg-[#2da44e] text-white hover:bg-[#2c974b] dark:bg-[#d03592] dark:text-white dark:hover:bg-[#b52c7b] border-0"
                 onClick={() => {
                   setTechData(null);
                   setUrl("");

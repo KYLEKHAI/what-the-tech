@@ -315,3 +315,198 @@ pre.raw-markdown {
   background-color: #161b22;
   color: #c9d1d9;
 }
+
+/* Custom dark mode styles to override defaults */
+.dark .prose pre,
+.dark pre.raw-markdown {
+  background-color: #000000 !important;
+  color: #e0e0e0 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dark .border {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dark .prose code {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Card styling in dark mode */
+.dark .card {
+  background-color: #111111 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dark .card-header {
+  background-color: #0a0a0a !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .card:hover {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Make nested cards stand out */
+.dark .card .card {
+  background-color: #191919 !important;
+}
+
+/* Custom styling for repo items in dark mode */
+.dark .bg-gray-100 {
+  background-color: #181818 !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: #121212 !important;
+}
+
+.dark .bg-gray-900 {
+  background-color: #070707 !important;
+}
+
+.dark .bg-gray-800 {
+  background-color: #101010 !important;
+}
+
+/* Custom tabs styling */
+.dark .bg-muted {
+  background-color: #181818 !important;
+}
+
+.dark .bg-background {
+  background-color: #282828 !important;
+}
+
+/* Custom badge styling for topics */
+.dark .rounded-full.bg-gray-100 {
+  background-color: #222222 !important;
+  color: #e0e0e0 !important;
+}
+
+/* Dark mode code  */
+.dark .hljs {
+  background-color: #121212 !important;
+  color: #e0e0e0 !important;
+}
+
+.dark .hljs-tag,
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-literal,
+.dark .hljs-strong,
+.dark .hljs-name {
+  color: #f48fb1 !important;
+}
+
+.dark .hljs-attr {
+  color: #7ee3ff !important;
+}
+
+.dark .hljs-string,
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-emphasis,
+.dark .hljs-type,
+.dark .hljs-built_in {
+  color: #a5d6a7 !important;
+}
+
+.dark .hljs-attribute,
+.dark .hljs-variable,
+.dark .hljs-bullet,
+.dark .hljs-quote {
+  color: #c5e1a5 !important;
+}
+
+.dark .hljs-comment,
+.dark .hljs-deletion {
+  color: #888888 !important;
+}
+
+/* Dark mode code blocks */
+.dark .prose code:not(pre code) {
+  color: #f48fb1 !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  padding: 2px 4px !important;
+  border-radius: 3px !important;
+}
+
+.dark .card,
+.dark .border-gray-800 {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Dark mode table styles */
+.dark .prose table tr {
+  background-color: #000 !important;
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .prose table tr:nth-child(2n) {
+  background-color: #111 !important;
+}
+
+.dark .prose table th,
+.dark .prose table td {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Dark mode text colors */
+.dark .text-gray-600 {
+  color: #a0a0a0 !important;
+}
+
+.dark .text-gray-500 {
+  color: #888888 !important;
+}
+
+.dark .text-gray-400 {
+  color: #777777 !important;
+}
+
+.dark .text-gray-300 {
+  color: #d4d4d4 !important;
+}
+
+.dark .text-gray-200 {
+  color: #e0e0e0 !important;
+}
+
+/* Dark mode button styling */
+.dark .bg-\[\#24292f\] {
+  background-color: #333333 !important;
+}
+
+.dark .hover\:bg-\[\#24292f\]:hover {
+  background-color: #444444 !important;
+}
+
+/* Dark mode links in details section */
+.dark a.flex.items-center.gap-1.px-3.py-1\.5.bg-gray-100 {
+  background-color: #222222 !important;
+}
+
+.dark a.flex.items-center.gap-1.px-3.py-1\.5.bg-gray-100:hover {
+  background-color: #333333 !important;
+}
+
+.dark a.flex.items-center.gap-2.px-3.py-2.bg-gray-100 {
+  background-color: #222222 !important;
+}
+
+.dark a.flex.items-center.gap-2.px-3.py-2.bg-gray-100:hover {
+  background-color: #333333 !important;
+}
+
+/* Dark mode border colors */
+.dark [class*="border-gray-800"],
+.dark [class*="border-gray-700"] {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dark [class*="hover:border-gray-600"]:hover,
+.dark [class*="hover:border-gray-500"]:hover {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
