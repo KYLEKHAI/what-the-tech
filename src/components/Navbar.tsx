@@ -14,7 +14,7 @@ const Navbar = () => {
             <img
               src="/what-the-stack-logo-tp.png"
               alt="What the Tech Logo"
-              className="h-16 w-16 mr-4"
+              className="h-16 w-16 mr-4 dark:bg-white/90 dark:p-1 dark:rounded-full transition-all"
             />
             What the Tech!
           </a>
