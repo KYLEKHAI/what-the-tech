@@ -50,10 +50,27 @@ import "highlight.js/styles/github.css";
 
 import "./App.css";
 import Navbar from "./components/Navbar";
+import { getDevIcon } from "./components/DevIconMapper"; // Added this import
 
 interface TechItem extends AnalyzerTechItem {}
 
 interface RepoInfo extends AnalyzerRepoInfo {}
+
+// Interface for the raw technology item from the backend
+interface SpecfyTechItem {
+  name: string;
+  type: string; // e.g., 'language', 'framework', 'ci', 'saas', 'database', 'hosting', 'tool', 'library'
+  language?: string;
+  path?: string[] | Set<string>; // Path can be an array or a Set from server
+  category?: string; // e.g., 'analyser', 'app', 'cicd', 'cloud', 'db', 'devops', 'etl', 'framework', 'hosting', 'language', 'lib', 'log', 'messaging', 'monitoring', 'network', 'project', 'runtime', 'saas', 'security', 'storage', 'tool'
+  dependencies?: string[];
+  linesOfCode?: number;
+  size?: number;
+  quality?: number;
+  confidence?: number;
+  tech?: string; // sometimes the primary tech identifier is here
+  parent?: string; // If it's part of a group/parent technology
+}
 
 interface TechData {
   languages: TechItem[];
@@ -260,6 +277,108 @@ function App() {
     };
   }, [techData]);
 
+  // Function to process Specfy analyzer output and merge with RepoInfo
+  const processSpecfyOutput = (
+    specfyOutput: SpecfyTechItem[],
+    repoInfo: RepoInfo
+  ): TechData => {
+    const languages: TechItem[] = [];
+    const frameworks: TechItem[] = [];
+    const apis: TechItem[] = []; // Representing 'saas', 'messaging', 'monitoring', 'etl' etc.
+    const resources: TechItem[] = []; // Representing 'db', 'hosting', 'storage', 'ci', 'tool', 'library' etc.
+
+    const uniqueTechNames = new Set<string>();
+
+    specfyOutput.forEach((item) => {
+      const techName = item.name || item.tech;
+      if (!techName || uniqueTechNames.has(techName)) {
+        return; // Skip if no name or already processed
+      }
+      uniqueTechNames.add(techName);
+
+      // Convert path to array if it's a Set (coming from some parts of specfy output)
+      let itemPathArray: string[] | undefined = undefined;
+      if (item.path) {
+        if (item.path instanceof Set) {
+          itemPathArray = Array.from(item.path);
+        } else if (Array.isArray(item.path)) {
+          itemPathArray = item.path;
+        }
+      }
+
+      const techItem: TechItem = {
+        name: techName,
+        icon: getDevIcon(techName),
+        // path: itemPathArray, // If you decide to add path to TechItem
+      };
+
+      // Categorize based on Specfy's 'type' or 'category'
+      // This is a simplified categorization, can be expanded
+      const itemType = item.type ? item.type.toLowerCase() : "";
+      const itemCategory = item.category ? item.category.toLowerCase() : "";
+
+      if (
+        itemType === "language" ||
+        itemCategory === "language" ||
+        itemCategory === "runtime"
+      ) {
+        languages.push(techItem);
+      } else if (
+        itemType === "framework" ||
+        itemCategory === "framework" ||
+        itemCategory === "app"
+      ) {
+        frameworks.push(techItem);
+      } else if (
+        [
+          "saas",
+          "api",
+          "messaging",
+          "monitoring",
+          "etl",
+          "log",
+          "security",
+          "network",
+        ].includes(itemType) ||
+        [
+          "saas",
+          "api",
+          "messaging",
+          "monitoring",
+          "etl",
+          "log",
+          "security",
+          "network",
+        ].includes(itemCategory)
+      ) {
+        apis.push(techItem);
+      } else {
+        // Default to resources for db, hosting, ci, tool, lib, storage etc.
+        resources.push(techItem);
+      }
+    });
+
+    // TODO: Re-implement or adapt 'groupRelatedTechnologies' if needed,
+    // For now, groupedTech will be empty.
+    // The original 'groupRelatedTechnologies' was in 'analyzer.ts' and might need
+    // the raw file list, which we don't have directly on the frontend anymore.
+    // Or, Specfy's output might already have parent/child relationships that can be used.
+
+    return {
+      languages,
+      frameworks,
+      apis,
+      resources,
+      repoInfo, // This comes from the original analyzeRepository call
+      groupedTech: {
+        languages: {},
+        frameworks: {},
+        apis: {},
+        resources: {},
+      }, // Placeholder for now
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -274,9 +393,9 @@ function App() {
     }
 
     setError(null);
+    setTechData(null); // Clear previous results
     setIsLoading(true);
 
-    // Extract owner and repo from GitHub URL
     const repoDetails = getRepoDetailsFromUrl(url);
 
     if (!repoDetails) {
@@ -286,23 +405,70 @@ function App() {
     }
 
     try {
-      // Use analyzer function to fetch and process data
-      const analysisResult = await analyzeRepository(
+      // Step 1: Fetch RepoInfo using the existing analyzer function (as per revised strategy)
+      // This part remains unchanged to preserve repository details tab functionality.
+      const initialAnalysisResult = await analyzeRepository(
         repoDetails.owner,
         repoDetails.repo
       );
 
-      if (!analysisResult) {
-        throw new Error("Failed to fetch repository information");
+      if (!initialAnalysisResult || !initialAnalysisResult.repoInfo) {
+        throw new Error("Failed to fetch repository details.");
+      }
+      const repoInfo = initialAnalysisResult.repoInfo;
+
+      // Step 2: Fetch tech stack from the new backend server
+      const backendResponse = await fetch(
+        `http://localhost:3001/analyze?githubUrl=${encodeURIComponent(url)}`
+      );
+
+      if (!backendResponse.ok) {
+        const errorData = await backendResponse
+          .json()
+          .catch(() => ({ details: backendResponse.statusText }));
+        throw new Error(
+          `Backend server error: ${backendResponse.status} ${
+            errorData?.details || backendResponse.statusText
+          }`
+        );
       }
 
-      // Set the fetched and analyzed data
-      setTechData(analysisResult);
-      setIsLoading(false);
-    } catch (err) {
-      setError(
-        "Failed to analyze repository. Please check the URL and try again."
+      // Expect an object with displayData and rawAnalysis
+      const responseData = await backendResponse.json();
+
+      if (
+        !responseData ||
+        !responseData.displayData ||
+        !responseData.rawAnalysis
+      ) {
+        throw new Error("Invalid data structure received from backend.");
+      }
+
+      const specfyTechStack: SpecfyTechItem[] = responseData.displayData;
+      const rawSpecfyJson = responseData.rawAnalysis;
+
+      // Log the raw Specfy JSON to the browser console
+      console.log(
+        "Raw Specfy Analyzer JSON (from result.toJson()):",
+        rawSpecfyJson
       );
+
+      if (!specfyTechStack) {
+        // Should be covered by the check above, but good practice
+        throw new Error("Failed to get tech stack from backend's displayData.");
+      }
+
+      // Step 3: Process Specfy output (displayData) and merge with repoInfo
+      const finalTechData = processSpecfyOutput(specfyTechStack, repoInfo);
+
+      setTechData(finalTechData);
+    } catch (err: any) {
+      console.error("Error in handleSubmit:", err);
+      setError(
+        err.message ||
+          "Failed to analyze repository. Please check the URL and try again."
+      );
+    } finally {
       setIsLoading(false);
     }
   };
